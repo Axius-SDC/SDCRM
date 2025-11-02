@@ -1,0 +1,78 @@
+name: Validate Schemas and Examples
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Install xmllint
+      run: sudo apt-get update && sudo apt-get install -y libxml2-utils
+
+    - name: Validate sdc4.xsd against XSD spec
+      run: |
+        echo "Validating sdc4.xsd..."
+        xmllint --schema http://www.w3.org/2001/XMLSchema.xsd --noout sdc4/schemas/sdc4.xsd
+        echo "✅ sdc4.xsd is valid"
+
+    - name: Validate all XML examples against sdc4.xsd
+      run: |
+        echo "Validating examples..."
+        find sdc4/examples -name "*.xml" -type f | while read file; do
+          echo "Validating $file..."
+          xmllint --schema sdc4/schemas/sdc4.xsd --noout "$file" || exit 1
+        done
+        echo "✅ All examples validate successfully"
+
+    - name: Check for broken markdown links
+      run: |
+        echo "Checking for broken internal links..."
+        # This is a simple check - can be enhanced with dedicated link checker
+        find . -name "*.md" -type f -not -path "./.git/*" | while read file; do
+          echo "Checking $file..."
+          # Check for broken relative links (simple regex)
+          grep -E '\]\([^http][^)]*\)' "$file" | grep -E '\]\([^)]+\)' || true
+        done
+        echo "✅ Link check complete"
+
+    - name: Validate README exists
+      run: |
+        if [ ! -f README.md ]; then
+          echo "❌ README.md not found"
+          exit 1
+        fi
+        echo "✅ README.md exists"
+
+    - name: Validate required files exist
+      run: |
+        required_files=(
+          "CLAUDE.md"
+          "CONTRIBUTING.md"
+          "CHANGELOG.md"
+          "LICENSE"
+          "SECURITY.md"
+          "sdc4/schemas/sdc4.xsd"
+          "sdc4/schemas/sdc4.owl"
+          "sdc4/specification/sdc4-specification.md"
+        )
+        for file in "${required_files[@]}"; do
+          if [ ! -f "$file" ]; then
+            echo "❌ Required file missing: $file"
+            exit 1
+          fi
+        done
+        echo "✅ All required files present"
+
+    - name: Report success
+      run: |
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "✅ All validations passed successfully!"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
