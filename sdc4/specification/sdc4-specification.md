@@ -347,9 +347,601 @@ Unlike traditional approaches, which often break backward compatibility and requ
 
 Implementers of the Semantic Data Charter should be aware of the following security considerations:
 
-* **Data Privacy:** When modeling data that contains personally identifiable information (PII), care must be taken to ensure compliance with relevant privacy regulations (e.g., GDPR, HIPAA).  
-* **Access Control:** The act (Access Control Tag) element in XdAnyType should be used to enforce access control policies.  
+* **Data Privacy:** When modeling data that contains personally identifiable information (PII), care must be taken to ensure compliance with relevant privacy regulations (e.g., GDPR, HIPAA).
+* **Access Control:** The act (Access Control Tag) element in XdAnyType should be used to enforce access control policies.
 * **Data Integrity:** The hash-result and hash-function elements in XdFileType can be used to verify the integrity of binary data.
+
+## **Appendix A: Xd* Type Reference and Standard Datatype Mappings**
+
+This appendix provides a comprehensive reference for all SDC4 extended data types (Xd* types), their corresponding Type classes, mappings to standard database and programming language datatypes, available constraints, and usage guidance.
+
+### **A.1. Overview**
+
+SDC4 provides semantically rich extended data types that enhance basic data values with governance, provenance, and constraint information. Each Xd* type consists of:
+
+- **Value Component**: The actual data value (e.g., `xdstring-value`, `xdcount-value`)
+- **Type Class**: The corresponding complexType definition (e.g., `XdStringType`, `XdCountType`)
+- **Constraint Capabilities**: Available validation rules specific to the type
+- **Metadata Support**: Inherited from `XdAnyType` (label, definition, temporal validity, access control)
+
+### **A.2. Textual Data Types**
+
+#### **A.2.1. XdString / XdStringType**
+
+**Purpose**: General-purpose character string data with rich constraint support.
+
+**Standard Datatype Mappings**:
+- SQL: `VARCHAR`, `TEXT`, `CHAR`, `NVARCHAR`, `CLOB`
+- JSON/JavaScript: `string`
+- Python: `str`
+- Java: `String`
+- C#: `string`
+
+**Available Constraints**:
+- `min_length`: Minimum string length (integer)
+- `max_length`: Maximum string length (integer)
+- `exact_length`: Fixed string length (integer)
+- `regex_pattern`: Regular expression pattern for validation
+- `enumeration`: List of allowed values (controlled vocabulary)
+
+**Use Cases**:
+- Free-text fields (names, addresses, descriptions)
+- Formatted strings (email, phone, postal codes) using regex patterns
+- Controlled vocabularies using enumeration constraints
+- Customer IDs, order numbers, SKUs
+
+**Example Schema Definition**:
+```xml
+<xsd:complexType name="mc-email-address">
+  <xsd:complexContent>
+    <xsd:restriction base="sdc4:XdStringType">
+      <xsd:sequence>
+        <xsd:element name="label" type="xsd:string" fixed="Email Address"/>
+        <xsd:element name="xdstring-value">
+          <xsd:simpleType>
+            <xsd:restriction base="xsd:string">
+              <xsd:pattern value="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"/>
+            </xsd:restriction>
+          </xsd:simpleType>
+        </xsd:element>
+      </xsd:sequence>
+    </xsd:restriction>
+  </xsd:complexContent>
+</xsd:complexType>
+```
+
+**When to Use**: Any textual data that doesn't require numeric calculations.
+
+---
+
+#### **A.2.2. XdToken / XdTokenType**
+
+**Purpose**: Normalized whitespace string for machine-readable identifiers and codes.
+
+**Standard Datatype Mappings**:
+- SQL: `VARCHAR` (with normalized whitespace)
+- JSON/JavaScript: `string`
+- Python: `str`
+- XML Schema: `xsd:token` (collapses whitespace, trims leading/trailing)
+
+**Available Constraints**:
+- Same as XdString (length constraints, patterns, enumeration)
+- Automatic whitespace normalization
+
+**Use Cases**:
+- Machine-readable codes (ISO codes, medical codes, product codes)
+- Standardized identifiers where whitespace variations should be ignored
+- API tokens, authentication codes
+
+**When to Use**: Choose XdToken over XdString when whitespace normalization is desired (e.g., codes that should ignore extra spaces).
+
+---
+
+### **A.3. Boolean Data Types**
+
+#### **A.3.1. XdBoolean / XdBooleanType**
+
+**Purpose**: True/false logical values with semantic labeling.
+
+**Standard Datatype Mappings**:
+- SQL: `BOOLEAN`, `BIT`, `TINYINT(1)`
+- JSON/JavaScript: `boolean`
+- Python: `bool`
+- Java: `Boolean`, `boolean`
+- C#: `bool`, `Boolean`
+
+**Available Constraints**:
+- Default value specification
+- Required/optional flags
+
+**Use Cases**:
+- Yes/no questions
+- Feature toggles, flags, switches
+- Consent indicators (GDPR, medical consent)
+- Status indicators (active/inactive, enabled/disabled)
+
+**Example Instance**:
+```xml
+<sdc4:ms-consent-given>
+  <sdc4:label>Patient Consent Given</sdc4:label>
+  <sdc4:xdboolean-value>true</sdc4:xdboolean-value>
+</sdc4:ms-consent-given>
+```
+
+**When to Use**: Binary states, logical conditions, yes/no decisions.
+
+---
+
+### **A.4. Numeric Data Types**
+
+SDC4 distinguishes between **quantified** (with units) and **non-quantified** (unitless) numeric types.
+
+#### **A.4.1. XdCount / XdCountType**
+
+**Purpose**: Non-negative integer counts with optional units.
+
+**Standard Datatype Mappings**:
+- SQL: `INTEGER`, `BIGINT`, `SMALLINT`, `INT` (with CHECK >= 0)
+- JSON/JavaScript: `number` (integer)
+- Python: `int` (>= 0)
+- Java: `Integer`, `Long` (>= 0)
+
+**Available Constraints**:
+- `min_value`: Minimum count (>= 0)
+- `max_value`: Maximum count
+- `units`: Required units specification (e.g., "items", "people", "shares")
+
+**Use Cases**:
+- Item quantities in inventory
+- Number of people, animals, objects
+- Event counts, occurrence counts
+- Share counts in financial trading
+
+**Example**:
+```xml
+<sdc4:ms-share-quantity>
+  <sdc4:label>Number of Shares</sdc4:label>
+  <sdc4:xdcount-value>100</sdc4:xdcount-value>
+  <sdc4:xdcount-units>
+    <sdc4:xdstring-value>shares</sdc4:xdstring-value>
+  </sdc4:xdcount-units>
+</sdc4:ms-share-quantity>
+```
+
+**When to Use**: Non-negative integers representing counts or quantities. Unlike XdQuantity, XdCount values are always whole numbers.
+
+---
+
+#### **A.4.2. XdQuantity / XdQuantityType**
+
+**Purpose**: Decimal numeric values with required units of measure (physical quantities).
+
+**Standard Datatype Mappings**:
+- SQL: `DECIMAL`, `NUMERIC`, `MONEY`
+- JSON/JavaScript: `number`
+- Python: `Decimal`, `float`
+- Java: `BigDecimal`, `Double`
+
+**Available Constraints**:
+- `min_value`: Minimum allowed value
+- `max_value`: Maximum allowed value
+- `precision`: Total number of significant digits
+- `scale`: Number of decimal places
+- `units`: **Required** units specification (e.g., "mmHg", "kg", "USD")
+
+**Use Cases**:
+- Physical measurements (blood pressure, temperature, weight, distance)
+- Financial amounts (currency values with currency code as unit)
+- Scientific measurements (chemical concentrations, power, energy)
+- Any decimal value requiring units
+
+**Example**:
+```xml
+<sdc4:ms-systolic-bp>
+  <sdc4:label>Systolic Blood Pressure</sdc4:label>
+  <sdc4:xdquantity-value>120</sdc4:xdquantity-value>
+  <sdc4:xdquantity-units>
+    <sdc4:xdstring-value>mmHg</sdc4:xdstring-value>
+  </sdc4:xdquantity-units>
+</sdc4:ms-systolic-bp>
+```
+
+**When to Use**: Any numeric value that represents a physical quantity and requires units. This is the most common quantified numeric type.
+
+---
+
+#### **A.4.3. XdFloat / XdFloatType**
+
+**Purpose**: Single-precision floating-point numbers (IEEE 754).
+
+**Standard Datatype Mappings**:
+- SQL: `REAL`, `FLOAT(24)`
+- JSON/JavaScript: `number`
+- Python: `float`
+- Java: `Float`, `float`
+- C#: `float`, `Single`
+
+**Available Constraints**:
+- `min_value`: Minimum allowed value
+- `max_value`: Maximum allowed value
+
+**Use Cases**:
+- Scientific calculations requiring floating-point representation
+- Graphics and gaming coordinates
+- Signal processing values
+- Performance metrics where precision beyond 7 significant digits is not required
+
+**When to Use**: Prefer XdFloat when single-precision (32-bit) floating-point is sufficient and memory efficiency is important.
+
+---
+
+#### **A.4.4. XdDouble / XdDoubleType**
+
+**Purpose**: Double-precision floating-point numbers (IEEE 754).
+
+**Standard Datatype Mappings**:
+- SQL: `DOUBLE PRECISION`, `FLOAT`, `FLOAT(53)`
+- JSON/JavaScript: `number`
+- Python: `float`
+- Java: `Double`, `double`
+- C#: `double`, `Double`
+
+**Available Constraints**:
+- `min_value`: Minimum allowed value
+- `max_value`: Maximum allowed value
+
+**Use Cases**:
+- High-precision scientific calculations
+- Astronomical calculations
+- Financial calculations requiring high precision
+- Geographic coordinates (latitude/longitude)
+
+**When to Use**: Use XdDouble when double-precision (64-bit) floating-point is required for accuracy. For financial data, consider XdQuantity with DECIMAL type instead to avoid floating-point rounding issues.
+
+---
+
+### **A.5. Temporal Data Types**
+
+#### **A.5.1. XdTemporal / XdTemporalType**
+
+**Purpose**: Flexible temporal data supporting various granularities (date, time, datetime, partial dates).
+
+**Standard Datatype Mappings**:
+- SQL: `DATE`, `TIME`, `TIMESTAMP`, `DATETIME`, `TIMESTAMPTZ`
+- JSON/JavaScript: `string` (ISO 8601 format)
+- Python: `datetime.date`, `datetime.time`, `datetime.datetime`
+- Java: `LocalDate`, `LocalTime`, `LocalDateTime`, `ZonedDateTime`
+
+**Available Constraints**:
+- `min_value`: Earliest allowed date/time
+- `max_value`: Latest allowed date/time
+- `granularity`: Precision level (year, month, day, hour, minute, second)
+- Timezone handling (with or without timezone)
+
+**Supported Formats**:
+- Full datetime: `2025-11-09T15:30:00Z`
+- Date only: `2025-11-09`
+- Time only: `15:30:00`
+- Partial date (year-month): `2025-11`
+- Year only: `2025`
+
+**Use Cases**:
+- Event timestamps
+- Birth dates, expiration dates
+- Appointment times
+- Measurement timestamps
+- Historical dates (with partial date support)
+
+**Example**:
+```xml
+<sdc4:ms-measurement-time>
+  <sdc4:label>Measurement Timestamp</sdc4:label>
+  <sdc4:xdtemporal-datetime>2025-11-09T14:30:00Z</sdc4:xdtemporal-datetime>
+</sdc4:ms-measurement-time>
+```
+
+**When to Use**: Any temporal data. XdTemporal's flexibility allows it to represent full timestamps, dates only, times only, or partial dates depending on data requirements.
+
+---
+
+### **A.6. Enumerated and Ordinal Data Types**
+
+#### **A.6.1. XdOrdinal / XdOrdinalType**
+
+**Purpose**: Ordered categorical values with semantic labels and numeric codes.
+
+**Standard Datatype Mappings**:
+- SQL: `SMALLINT` or `VARCHAR` with lookup table
+- JSON/JavaScript: `number` or `string`
+- Python: `int` or `str` (often using `Enum`)
+- Java: `Enum`
+
+**Available Constraints**:
+- Defined set of allowed ordinal values (label + code pairs)
+- Order preservation (codes represent meaningful ordering)
+
+**Use Cases**:
+- Severity levels (mild=1, moderate=2, severe=3)
+- Priority rankings (low=1, medium=2, high=3)
+- Educational levels (elementary=1, high school=2, college=3)
+- Likert scales (strongly disagree=1, disagree=2, neutral=3, agree=4, strongly agree=5)
+
+**Example**:
+```xml
+<sdc4:ms-pain-level>
+  <sdc4:label>Pain Severity</sdc4:label>
+  <sdc4:xdordinal-value>2</sdc4:xdordinal-value>
+  <sdc4:xdordinal-symbol>
+    <sdc4:xdstring-value>Moderate</sdc4:xdstring-value>
+  </sdc4:xdordinal-symbol>
+</sdc4:ms-pain-level>
+```
+
+**When to Use**: Use XdOrdinal when categories have a meaningful order. For unordered categories (e.g., colors, countries), use XdString with enumeration constraint.
+
+---
+
+### **A.7. Reference and Link Types**
+
+#### **A.7.1. XdLink / XdLinkType**
+
+**Purpose**: References to other data models, external resources, or relationships.
+
+**Standard Datatype Mappings**:
+- SQL: `VARCHAR` (for URIs), foreign key references
+- JSON/JavaScript: `string` (URI/URL), object reference
+- Python: Foreign key, URI string
+- Java: `URI`, `URL`, reference
+
+**Available Constraints**:
+- URI format validation
+- Allowed target types
+- Relationship semantics
+
+**Use Cases**:
+- References between data models (e.g., Patient → Encounter)
+- External document links
+- Ontology concept URIs
+- API endpoint references
+- Hyperlinks to related resources
+
+**Example**:
+```xml
+<sdc4:ms-patient-reference>
+  <sdc4:label>Related Patient</sdc4:label>
+  <sdc4:xdlink-uri>dm-patient-clj5x9z...</sdc4:xdlink-uri>
+  <sdc4:xdlink-relationship>subject_of</sdc4:xdlink-relationship>
+</sdc4:ms-patient-reference>
+```
+
+**When to Use**: Any reference to another entity, document, or resource. XdLink provides semantic relationship information beyond simple foreign keys.
+
+---
+
+### **A.8. Binary Data Types**
+
+#### **A.8.1. XdFile / XdFileType**
+
+**Purpose**: Binary data or file references with metadata and integrity checking.
+
+**Standard Datatype Mappings**:
+- SQL: `BLOB`, `BYTEA`, `VARBINARY`, `VARCHAR` (for file paths)
+- JSON/JavaScript: Base64 encoded string, file path
+- Python: `bytes`, file path string
+- Java: `byte[]`, `File`, `Path`
+
+**Available Constraints**:
+- File size limits (`max_size`)
+- Allowed MIME types (`media_type`)
+- Hash algorithm specification (`hash_function`)
+- Storage location (embedded vs. referenced)
+
+**Metadata Included**:
+- Original filename
+- MIME type / media type
+- File size
+- Hash for integrity verification (SHA-256, SHA-512, etc.)
+- Compression algorithm (if compressed)
+
+**Use Cases**:
+- Document attachments (PDFs, Word docs, spreadsheets)
+- Images (JPEG, PNG, DICOM medical images)
+- Audio/video files
+- Encrypted files with hash verification
+- Archived data
+
+**Example**:
+```xml
+<sdc4:ms-patient-photo>
+  <sdc4:label>Patient Photograph</sdc4:label>
+  <sdc4:xdfile-media-type>image/jpeg</sdc4:xdfile-media-type>
+  <sdc4:xdfile-uri>file:///patient-photos/12345.jpg</sdc4:xdfile-uri>
+  <sdc4:xdfile-size>245760</sdc4:xdfile-size>
+  <sdc4:xdfile-hash-function>SHA-256</sdc4:xdfile-hash-function>
+  <sdc4:xdfile-hash-result>a3f5b...</sdc4:xdfile-hash-result>
+</sdc4:ms-patient-photo>
+```
+
+**When to Use**: Binary data storage or file references. XdFile supports both embedded base64-encoded data and external file references with integrity verification.
+
+---
+
+### **A.9. Interval and Range Types**
+
+#### **A.9.1. XdInterval / XdIntervalType**
+
+**Purpose**: Ranges or intervals with upper and lower bounds.
+
+**Standard Datatype Mappings**:
+- SQL: Two columns (lower_bound, upper_bound), or `RANGE` types (PostgreSQL)
+- JSON/JavaScript: Object with `min` and `max` properties
+- Python: Tuple, custom Range class
+- Java: Custom Range class
+
+**Interval Types Supported**:
+- **XdCountInterval**: Integer count ranges
+- **XdQuantityInterval**: Decimal quantity ranges with units
+- **XdTemporalInterval**: Date/time ranges (periods)
+
+**Use Cases**:
+- Normal ranges (e.g., normal blood pressure: 90-120 mmHg)
+- Age ranges (18-65 years)
+- Date ranges (event start to end)
+- Acceptable value ranges for validation
+- Quantity ranges (price ranges, measurement ranges)
+
+**Example (XdQuantityInterval)**:
+```xml
+<sdc4:ms-normal-systolic-range>
+  <sdc4:label>Normal Systolic BP Range</sdc4:label>
+  <sdc4:xdquantity-interval-lower>90</sdc4:xdquantity-interval-lower>
+  <sdc4:xdquantity-interval-upper>120</sdc4:xdquantity-interval-upper>
+  <sdc4:xdquantity-units>
+    <sdc4:xdstring-value>mmHg</sdc4:xdstring-value>
+  </sdc4:xdquantity-units>
+</sdc4:ms-normal-systolic-range>
+```
+
+**When to Use**: Any data representing a range of values. XdInterval types provide semantic meaning for lower/upper bounds and can express inclusive/exclusive boundaries.
+
+---
+
+### **A.10. Type Selection Decision Tree**
+
+Use this decision tree to select the appropriate Xd* type:
+
+**1. Is the data textual?**
+- **Yes**: XdString (or XdToken for normalized codes)
+
+**2. Is the data boolean (true/false)?**
+- **Yes**: XdBoolean
+
+**3. Is the data numeric?**
+- **Yes, whole numbers only (counts)**: XdCount
+- **Yes, decimal values with units**: XdQuantity
+- **Yes, scientific floating-point**: XdFloat or XdDouble
+- **Yes, ordered categorical**: XdOrdinal
+
+**4. Is the data temporal (date/time)?**
+- **Yes**: XdTemporal
+
+**5. Is the data a reference or link?**
+- **Yes**: XdLink
+
+**6. Is the data binary or a file?**
+- **Yes**: XdFile
+
+**7. Is the data a range or interval?**
+- **Yes**: XdInterval (XdCountInterval, XdQuantityInterval, or XdTemporalInterval)
+
+---
+
+### **A.11. Constraint Summary by Type**
+
+| **Xd* Type** | **Length** | **Value Range** | **Format/Pattern** | **Enumeration** | **Units** | **Other** |
+|--------------|------------|-----------------|-------------------|-----------------|-----------|-----------|
+| XdString     | ✓          | -               | ✓ (regex)          | ✓               | -         | -         |
+| XdToken      | ✓          | -               | ✓ (regex)          | ✓               | -         | Whitespace normalization |
+| XdBoolean    | -          | -               | -                 | -               | -         | Default value |
+| XdCount      | -          | ✓ (min/max)     | -                 | -               | ✓         | Non-negative integers |
+| XdQuantity   | -          | ✓ (min/max)     | -                 | -               | ✓ (required) | Precision, scale |
+| XdFloat      | -          | ✓ (min/max)     | -                 | -               | -         | IEEE 754 single |
+| XdDouble     | -          | ✓ (min/max)     | -                 | -               | -         | IEEE 754 double |
+| XdTemporal   | -          | ✓ (min/max)     | ✓ (ISO 8601)       | -               | -         | Granularity, timezone |
+| XdOrdinal    | -          | ✓ (defined set) | -                 | ✓ (ordered)     | -         | Code + label pairs |
+| XdLink       | -          | -               | ✓ (URI)            | ✓ (target types) | -         | Relationship semantics |
+| XdFile       | ✓ (size)   | -               | ✓ (MIME type)      | -               | -         | Hash, compression |
+| XdInterval   | -          | ✓ (bounds)      | -                 | -               | ✓ (for Quantity) | Inclusive/exclusive |
+
+---
+
+### **A.12. Common Datatype Mapping Examples**
+
+#### **CSV/Spreadsheet to Xd* Types**
+
+| **CSV Data** | **Example Value** | **Xd* Type** | **Reasoning** |
+|--------------|-------------------|--------------|---------------|
+| Name, Address, Description | "John Doe" | XdString | Free-text character data |
+| Country Code, Product SKU | "US", "SKU-12345" | XdString (with enumeration or pattern) | Controlled codes |
+| Enabled, Active, Consented | "true", "yes", "1" | XdBoolean | Boolean logic |
+| Quantity, Count, Number of Items | 42, 1000 | XdCount | Non-negative integers |
+| Price, Weight, Temperature | 19.99, 72.5 | XdQuantity | Decimal with units |
+| Date, DateTime, Timestamp | "2025-11-09", "2025-11-09T15:30:00Z" | XdTemporal | Temporal data |
+| Priority, Severity, Rating | "High", "Severe" | XdOrdinal | Ordered categories |
+| Email, URL, Reference ID | "user@example.com" | XdString (with regex pattern) | Formatted strings |
+
+#### **Database Column to Xd* Types**
+
+| **SQL Type** | **Xd* Type** | **Notes** |
+|--------------|--------------|-----------|
+| VARCHAR, CHAR, TEXT | XdString | General text |
+| BOOLEAN, BIT | XdBoolean | Boolean values |
+| INTEGER, SMALLINT, BIGINT | XdCount | Non-negative counts; use XdQuantity if negative values allowed |
+| DECIMAL, NUMERIC | XdQuantity | Quantities with units |
+| REAL, FLOAT(24) | XdFloat | Single-precision floating-point |
+| DOUBLE PRECISION, FLOAT(53) | XdDouble | Double-precision floating-point |
+| DATE, TIMESTAMP | XdTemporal | Temporal data |
+| ENUM (ordered) | XdOrdinal | Ordered enumerations |
+| BLOB, BYTEA | XdFile | Binary data |
+| Foreign Key, URI column | XdLink | References to other entities |
+
+---
+
+### **A.13. Best Practices**
+
+1. **Always Use Units for Quantified Types**: XdCount and XdQuantity require units. Even if units seem obvious (e.g., "items"), specify them explicitly.
+
+2. **Choose Appropriate Numeric Types**:
+   - Use **XdCount** for non-negative integer counts
+   - Use **XdQuantity** for decimal measurements with units
+   - Use **XdFloat/XdDouble** only for scientific calculations where floating-point representation is required
+   - Avoid XdFloat/XdDouble for financial data (use XdQuantity with DECIMAL instead)
+
+3. **Leverage Constraints**: Define constraints in the schema (regex patterns, min/max values, enumerations) to ensure data quality.
+
+4. **Use XdOrdinal for Ordered Categories**: If categories have meaningful order (severity, priority), use XdOrdinal instead of XdString.
+
+5. **Embed Semantics in Labels**: Use the fixed `label` element in schema definitions to provide immutable semantic meaning.
+
+6. **Temporal Granularity**: XdTemporal supports various granularities. Choose the appropriate level (date only, datetime, etc.) based on requirements.
+
+7. **File Integrity**: When using XdFile, always include hash values for integrity verification, especially for medical or financial documents.
+
+8. **Link Relationships**: When using XdLink, specify the relationship semantics (e.g., "subject_of", "part_of", "derived_from") for clarity.
+
+---
+
+### **A.14. Xd* Type Inheritance Hierarchy**
+
+```
+XdAnyType (base type - provides label, definition, temporal metadata, access control)
+├── XdStringType
+├── XdTokenType
+├── XdBooleanType
+├── XdOrderedType (abstract - provides ordering semantics)
+│   ├── XdOrdinalType
+│   └── XdQuantifiedType (abstract - provides units, magnitude status)
+│       ├── XdCountType
+│       ├── XdQuantityType
+│       ├── XdFloatType
+│       └── XdDoubleType
+├── XdTemporalType
+├── XdLinkType
+├── XdFileType
+└── XdIntervalType (abstract)
+    ├── XdCountIntervalType
+    ├── XdQuantityIntervalType
+    └── XdTemporalIntervalType
+```
+
+**Key Points**:
+- All types inherit governance and provenance metadata from `XdAnyType`
+- **Quantified types** (XdCount, XdQuantity, XdFloat, XdDouble) inherit from `XdQuantifiedType` and require units
+- **Interval types** provide range semantics for their corresponding base types
+
+---
+
+This appendix serves as the authoritative reference for Xd* type selection and usage in SDC4 data modeling.
 
 ## 
 
